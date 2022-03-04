@@ -1,10 +1,18 @@
 ---
-- name: configure webserver without tls
+- name: configure webserver with out and without tls
   hosts: nodes
   gather_facts: true
   become: true
   vars:
     nginx_port_no_tls: 80
+    nginx_port_with_tls: 443
+
+    path_to_ssl: /etc/nginx/ssl/
+    private_key_dir: private/
+    csr_dir: csr/
+    cert_dir:  crt/
+    sever_hostname: ansible-test  # will be filename prefix
+
   tasks:
     - name: create nginx repo definition
       copy:
@@ -19,6 +27,50 @@
         name: nginx
         update_cache: true
         state: present
+
+    - name: Upgrade pip2 
+      pip:
+        name: pip ~= 20.1
+
+    - name: Install the required Python library cryptography
+      pip:
+        name: cryptography >= 1.6
+
+    - name: Create directory for private key file if it doesn't exist
+      file:
+        path: '{{ path_to_ssl }}{{ private_key_dir }}'
+        state: directory
+        mode: '0755'
+
+    - name: Create directory for an OpenSSL Certificate Signing Request file if it doesn't exist
+      file:
+        path: '{{ path_to_ssl }}{{ csr_dir }}'
+        state: directory
+        mode: '0755'
+
+    - name: Create directory for an OpenSSL certificate if it doesn't exist
+      file:
+        path: '{{ path_to_ssl }}{{ cert_dir }}'
+        state: directory
+        mode: '0755'
+
+    - name: Generate an OpenSSL private key with the default values (4096 bits, RSA)
+      openssl_privatekey:
+        path: '{{ path_to_ssl }}{{ private_key_dir }}{{ sever_hostname }}.pem'
+        backup: yes
+
+    - name: Generate an OpenSSL Certificate Signing Request
+      openssl_csr:
+        path: '{{ path_to_ssl }}{{ csr_dir }}{{ sever_hostname }}.csr'
+        privatekey_path: '{{ path_to_ssl }}{{ private_key_dir }}{{ sever_hostname }}.pem'
+        common_name: '{{ sever_hostname }}'
+
+    - name: Generate a Self Signed OpenSSL certificate 
+      community.crypto.x509_certificate:
+        path: '{{ path_to_ssl }}{{ cert_dir }}{{ sever_hostname }}.crt'
+        privatekey_path: '{{ path_to_ssl }}{{ private_key_dir }}{{ sever_hostname }}.pem'
+        csr_path: '{{ path_to_ssl }}{{ csr_dir }}{{ sever_hostname }}.csr'
+        provider: selfsigned
 
     - name: copy main nginx config file
       copy:
@@ -53,7 +105,7 @@
         state: started
         enabled: true
 
-    - name: insert firewalld rule for nginx
+    - name: insert firewalld rule for nginx (port {{ nginx_port_no_tls }}/tcp)
       firewalld:
         port: "{{ nginx_port_no_tls }}/tcp"
         permanent: true
@@ -61,11 +113,29 @@
         immediate: true
       ignore_errors: true
 
+    - name: insert firewalld rule for nginx (port {{ nginx_port_with_tls }}/tcp)
+      firewalld:
+        port: "{{ nginx_port_with_tls }}/tcp"
+        permanent: true
+        state: enabled
+        immediate: true
+      ignore_errors: true
+
   post_tasks:
-    - name: check web site from control server
+    - name: check web site from control server without TLS
       uri:
         url: "http://{{ ansible_host }}:{{ nginx_port_no_tls }}"
         return_content: true
+        validate_certs: false
+      connection: local
+      register: example_webpage_out
+      failed_when: example_webpage_out.status != 200
+
+    - name: check web site from control server with TLS
+      uri:
+        url: "https://{{ ansible_host }}:{{ nginx_port_with_tls }}"
+        return_content: true
+        validate_certs: false
       connection: local
       register: example_webpage_out
       failed_when: example_webpage_out.status != 200
