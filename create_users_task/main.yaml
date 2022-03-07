@@ -1,0 +1,22 @@
+---
+- name: Create users 
+  hosts: nodes
+  gather_facts: true
+  become: true
+  vars:
+    GECOS_data: 'Ansible-generated user'
+    time_delay: 5  # sec
+  vars_files:
+    - vars/vault_users_data.yaml
+
+  tasks:
+    - name: Create users
+      user:
+        name: "{{ user.username }}"
+        comment: "{{ GECOS_data }}"
+        password: "{{ user.password | password_hash('sha512') }}"
+      loop: "{{ users_list }}"
+      loop_control:
+        loop_var: user
+        pause: "{{ time_delay }}"
+      no_log: true
