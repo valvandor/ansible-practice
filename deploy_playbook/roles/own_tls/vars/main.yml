@@ -1,0 +1,9 @@
+---
+# vars file for own_tls
+
+# below variables must be identical for webserver role
+path_to_ssl: /etc/nginx/ssl/
+private_key_dir: private/
+csr_dir: csr/
+cert_dir:  crt/
+server_hostname: ansible-test  # will be filename prefix

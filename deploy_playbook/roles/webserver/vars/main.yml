@@ -1,0 +1,9 @@
+---
+# vars file for nginx
+nginx_port_no_tls: 80
+nginx_port_with_tls: 443
+path_to_ssl: /etc/nginx/ssl/
+private_key_dir: private/
+csr_dir: csr/
+cert_dir:  crt/
+server_hostname: ansible-test  # will be filename prefix

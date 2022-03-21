@@ -1,0 +1,54 @@
+---
+# tasks file for own_tls
+- name: Сreate the necessary environment 
+  become: true
+  block:
+    - name: Upgrade pip2 
+      pip:
+        name: pip ~= 20.1
+
+    - name: Install the Python library "cryptography"
+      pip:
+        name: cryptography >= 1.6
+
+- name: create directories for files if they not exists
+  become: true
+  block:
+    - name: Create directory for private key file 
+      file:
+        path: '{{ path_to_ssl }}{{ private_key_dir }}'
+        state: directory
+        mode: '0755'
+
+    - name: Create directory for an OpenSSL Certificate Signing Request file 
+      file:
+        path: '{{ path_to_ssl }}{{ csr_dir }}'
+        state: directory
+        mode: '0755'
+
+    - name: Create directory for an OpenSSL certificate 
+      file:
+        path: '{{ path_to_ssl }}{{ cert_dir }}'
+        state: directory
+        mode: '0755'
+  
+- name: Generate self-signed cert
+  become: true
+  block:
+    - name: Generate an OpenSSL private key with the default values (4096 bits, RSA)
+      openssl_privatekey:
+        path: '{{ path_to_ssl }}{{ private_key_dir }}{{ server_hostname }}.pem'
+        backup: yes
+
+    - name: Generate an OpenSSL Certificate Signing Request
+      openssl_csr:
+        path: '{{ path_to_ssl }}{{ csr_dir }}{{ server_hostname }}.csr'
+        privatekey_path: '{{ path_to_ssl }}{{ private_key_dir }}{{ server_hostname }}.pem'
+        common_name: '{{ server_hostname }}'
+
+    - name: Generate a Self Signed OpenSSL certificate 
+      community.crypto.x509_certificate:
+        path: '{{ path_to_ssl }}{{ cert_dir }}{{ server_hostname }}.crt'
+        privatekey_path: '{{ path_to_ssl }}{{ private_key_dir }}{{ server_hostname }}.pem'
+        csr_path: '{{ path_to_ssl }}{{ csr_dir }}{{ server_hostname }}.csr'
+        provider: selfsigned
