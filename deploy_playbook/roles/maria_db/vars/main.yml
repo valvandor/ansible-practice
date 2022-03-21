@@ -1,3 +1,5 @@
+---
+# vars file for maria_db
 mysql_port: 3306
 db_user: ansible_user
 db_password: pass
